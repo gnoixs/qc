@@ -2,17 +2,18 @@ var mongoose = require('mongoose');
 var objectId = mongoose.Schema.Types.ObjectId;
 var dbconf = require('../db_config');
 
-mongoose.connect(dbconf.dbURL);
+var db = mongoose.connect(dbconf.dbURL);
 
 exports.Withdraw = mongoose.model('withdraw',new mongoose.Schema({
+	orderId:String,
 	userId:String,
 	userName:String,
 	userTel:String,
-	bankType:String,
+	bank:String,
+	branch:String,
 	bankNo:String,
-	amount_before_fee:String,
-	amount_after_fee:String,
-	wdAddr:String,
-	subTime:String,
-	orderId:String
+	withdrawAddr:String,
+	amountBeforeFee:String,
+	amountAfterFee:String,
+	applyTime:String
 }));
