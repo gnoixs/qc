@@ -6,10 +6,12 @@ var sync_request = require('sync-request');
 
 var szphlx_config = require('./config/szphlx');
 
-//查询字符串
-var _querystr = querystring.stringify(szphlx_config.getQuerystr(0, 10, formatDate(), formatDate()));
+//query string
+var _times;
+var count = 0;
+var _querystr = querystring.stringify(szphlx_config.getQuerystr(null, null, formatDate(), null));
 
-//请求参数
+//request parameter
 var opt = {
 	url: szphlx_config.url + _querystr,
 	method: 'GET',
@@ -19,29 +21,51 @@ var opt = {
 	}
 }
 
-
-request(opt, function(err, response, res) {
-	if (err) {
-		console.log(err);
-		return;
+function requestInfo(){
+	if(count > 0){
+		_querystr = querystring.stringify(szphlx_config.getQuerystr(count, null, formatDate(), null));
+		opt.url = szphlx_config.url + _querystr;
 	}
-	if (response.statusCode == 200) {
-		var $ = cheerio.load(res, {
-			decodeEntities: false
-		});
-		var objArr = [];
-		var trs = $('.simpleTable tr');
-		console.log(trs.length);
-		var errArr = []; 			//错误消息
-		storageInfo($,trs,objArr,errArr);
-		
+	request(opt, function(err, response, res) {
+		if (err) {
+			console.log(err);
+			return;
+		}
+		if (response.statusCode == 200) {
+			var $ = cheerio.load(res, {
+				decodeEntities: false
+			});
 
-		//checkOrder($,trs,objArr,errArr);
+			var objArr = [];
+			var trs = $('.simpleTable tr');
+			
+			//first time load
+			if(szphlx_config.querystr.pageIndex == 0){
+				_times = $('.RightTitle').eq(1).find('b').find('span').eq(0).text().split(' ')[3];
+				if(_times % szphlx_config.querystr.pageSize == 0){
+					_times = _times / szphlx_config.querystr.pageSize;
+				}else{
+					_times = Math.floor(_times / szphlx_config.querystr.pageSize) + 1;
+				}
+				if(trs.length == 0){
+					console.log("session fail...");
+					return;
+				}
+			}
 
-		//console.log("共有：" + errArr.length + "条错误");
-		//console.log(objArr);
-	}
-});
+			//console.log(trs.length);
+			var errArr = []; 			//error messages
+			storageInfo($,trs,objArr,errArr);
+			if(count < _times){
+				process.nextTick(requestInfo);
+			}
+			
+		}
+	});
+	count++;
+}
+
+requestInfo();
 
 function sleep(sleepTime) {
 	for (var start = +new Date(); + new Date() - start <= sleepTime;) {
@@ -147,7 +171,7 @@ function checkOrder($, trs,objArr,errArr) {
 	});
 }
 
-function storageInfo($, trs,objArr){
+function storageInfo($, trs,objArr,errArr){
 	trs.each(function(index, tr) {
 		if (index == 0) {
 			//表頭元素
@@ -183,7 +207,7 @@ function storageInfo($, trs,objArr){
 			objArr.push(obj);
 		}
 	});
-	storage(objArr);
+	storage(objArr,errArr);
 }
 
 function formatDate(){
@@ -194,28 +218,29 @@ function formatDate(){
 	return y + "-" + m + "-" + d;
 }
 
-function storage(objArr){
-	var count = 0;
-	for(var i = 0 ; i < objArr.length; i++){
-		models.Withdraw.findOne({"userId":objArr[i].userId},function(err,obj){
+function storage(objArr,errArr){
+	//node.js里面forEach是同步的？！
+	objArr.forEach( function(element, index) {
+		models.Withdraw.findOne({"userId":element.userId},function(err,obj){
 			if(err){
-				throw Error("查询错误");
+				objArr.push(element);
+				console.log("find "+ element.userName + " error...");
 			}else{
-				if(obj){		//说明用户已经存在
-					console.log(obj.userId);
+				if(obj){		//user existed
+					//console.log(element.userId + ' existed...');
 				}else{
-					models.Withdraw.create(objArr[i],function(err,doc){
+					models.Withdraw.create(element,function(err,doc){
 						if(err){
-							console.log("插入数据库出错");
-							errArr.push(objArr[i]);
-						}else{
-							//插入成功
-							count++;
+							console.log("insert " + element.userName + " error...");
+							objArr.push(element);
+							//errArr.push(element);
+						}else{	//insert success
+							//console.log(element.userId + ' insert success...');
 						}
 					});	
 				}
 			}
 		});
-	}
-	console.log("共处理："+ count +"条数据");
+	});
+	
 }

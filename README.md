@@ -1,1 +1,4 @@
-# qc
+# run
+```
+	node task.js
+```

@@ -11,7 +11,7 @@ var szphlx = function(){
 	this.url = 'http://qqbaidulecai.szphlx.com:58755/FinanceManage/WithdrawDetail?';
 	this.querystr = {
 		'pageIndex': 0,
-		'pageSize': 0,
+		'pageSize': 200,
 		'agentWay': -1,
 		'startTime': '2016-12-12',
 		'endTime': '2016-12-12',
@@ -20,17 +20,26 @@ var szphlx = function(){
 	};
 	this.cookie =getCookie("szphlx_cookie");
 	this.getQuerystr = function(pageIndex,pageSize,startTime,endTime,agentWay,sltSortType,Money){
-		//四個必要參數
-		if(typeof pageIndex == undefined || typeof pageSize == undefined || typeof startTime == undefined || typeof endTime == undefined){
-			throw Error("補充查詢參數");
+		if(typeof pageIndex != undefined && pageIndex !=null){
+			this.querystr.pageIndex = pageIndex;
 		}
-		this.querystr.pageIndex = pageIndex;
-		this.querystr.pageSize = pageSize;
-		this.querystr.startTime = startTime;
-		this.querystr.endTime = endTime;
+		if(typeof pageSize != undefined && pageSize !=null){
+			this.querystr.pageSize = pageSize;
+		}
+		if(typeof startTime != undefined && startTime !=null){
+			this.querystr.startTime = startTime;
+		}
+		if(typeof endTime != undefined){
+			if(endTime !=null){
+				this.querystr.endTime = endTime;
+			}else{
+				this.querystr.endTime = this.querystr.startTime;
+			}
+		}
+		
 		
 		//其他參數可以選傳
-		if(typeof agentWay != undefined &&agentWay != null){
+		if(typeof agentWay != undefined && agentWay != null){
 			this.querystr.agentWay = agentWay;
 		}
 		if(typeof sltSortType != undefined && sltSortType != null){
