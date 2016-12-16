@@ -39,7 +39,7 @@ request.post({
 		'passWord':'1Qaz2Wsx'
 	}},function(err,httpResponse,body){
 		logger.info('login success!');
-		fs.writeFile(path.join(__dirname,"cookies/szphlx_cookie.txt"),httpResponse.headers['set-cookie'],function(){
+		fs.writeFile(path.join(__dirname,"cookies/szphlx_cookie.txt"),httpResponse.headers['set-cookie'].toString().split(';')[0],function(){
 			logger.info('write cookie over!');
 			requestInfo();
 		})
