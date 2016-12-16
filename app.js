@@ -1,10 +1,20 @@
-var request = require("request");
-var cheerio = require("cheerio");
-var models = require('./models/deal');
-var querystring = require('querystring');
+var request = require("request");		//request
 var sync_request = require('sync-request');
 
+var cheerio = require("cheerio");		//to explain html
+var models = require('./models/deal');
+
 var szphlx_config = require('./config/szphlx');
+
+var querystring = require('querystring');
+var path = require('path');
+var fs = require('fs');
+
+var log4js = require('log4js');
+var log4js_conf = require('./log4js.json')
+log4js.configure(log4js_conf);
+
+var logger = log4js.getLogger('log_date');
 
 //query string
 var _times;
@@ -21,34 +31,57 @@ var opt = {
 	}
 }
 
+//login 
+request.post({
+	'url':'http://qqbaidulecai.szphlx.com:58755/Home/LoginFunction',
+	'form':{
+		'userName':'qccaiwu10',
+		'passWord':'1Qaz2Wsx'
+	}},function(err,httpResponse,body){
+		logger.info('login success!');
+		fs.writeFile(path.join(__dirname,"cookies/szphlx_cookie.txt"),httpResponse.headers['set-cookie'],function(){
+			logger.info('write cookie over!');
+			requestInfo();
+		})
+	});
+
+
+
 function requestInfo(){
+	logger.debug("count: "+count+",第"+(count+1)+"页");
 	if(count > 0){
 		_querystr = querystring.stringify(szphlx_config.getQuerystr(count, null, formatDate(), null));
 		opt.url = szphlx_config.url + _querystr;
+		logger.info('page changed...');
 	}
 	request(opt, function(err, response, res) {
+		logger.debug("url:" + opt.url.split('?')[1]);
 		if (err) {
-			console.log(err);
+			logger.error('request withdraws list fail...')
 			return;
 		}
 		if (response.statusCode == 200) {
+			logger.info('request withdraws list success...')
 			var $ = cheerio.load(res, {
 				decodeEntities: false
 			});
 
 			var objArr = [];
 			var trs = $('.simpleTable tr');
+			logger.debug("本轮共获取:"+trs.length+"条数据");
 			
 			//first time load
 			if(szphlx_config.querystr.pageIndex == 0){
+				logger.info('first page...')
 				_times = $('.RightTitle').eq(1).find('b').find('span').eq(0).text().split(' ')[3];
 				if(_times % szphlx_config.querystr.pageSize == 0){
 					_times = _times / szphlx_config.querystr.pageSize;
 				}else{
 					_times = Math.floor(_times / szphlx_config.querystr.pageSize) + 1;
 				}
+				logger.debug("一共需要请求："+_times+"次");
 				if(trs.length == 0){
-					console.log("session fail...");
+					logger.error("session fail...");
 					return;
 				}
 			}
@@ -56,16 +89,18 @@ function requestInfo(){
 			//console.log(trs.length);
 			var errArr = []; 			//error messages
 			storageInfo($,trs,objArr,errArr);
-			if(count < _times){
+			logger.debug("count:"+count+",_times:"+_times);
+			if(count < _times-1){
+				count++;
 				process.nextTick(requestInfo);
 			}
 			
 		}
 	});
-	count++;
+	
 }
 
-requestInfo();
+
 
 function sleep(sleepTime) {
 	for (var start = +new Date(); + new Date() - start <= sleepTime;) {
@@ -73,7 +108,7 @@ function sleep(sleepTime) {
 	}
 }
 
-function checkOrder($, trs,objArr,errArr) {
+/*function checkOrder($, trs,objArr,errArr) {
 	trs.each(function(index, tr) {
 		if (index == 0) {
 			//表頭元素
@@ -169,7 +204,7 @@ function checkOrder($, trs,objArr,errArr) {
 			}
 		}
 	});
-}
+}*/
 
 function storageInfo($, trs,objArr,errArr){
 	trs.each(function(index, tr) {
@@ -224,18 +259,17 @@ function storage(objArr,errArr){
 		models.Withdraw.findOne({"userId":element.userId},function(err,obj){
 			if(err){
 				objArr.push(element);
-				console.log("find "+ element.userName + " error...");
+				logger.error("find ["+ index + "] "+element.userName + " error...")
 			}else{
 				if(obj){		//user existed
-					//console.log(element.userId + ' existed...');
+					logger.warn("user ["+ index +"] " + element.userName + ' existed...');
 				}else{
 					models.Withdraw.create(element,function(err,doc){
 						if(err){
-							console.log("insert " + element.userName + " error...");
+							logger.error("insert {" + index + "] " + element.userName + " error...")
 							objArr.push(element);
-							//errArr.push(element);
 						}else{	//insert success
-							//console.log(element.userId + ' insert success...');
+							logger.info("user [" + index + "] " + element.userName + ' insert success...')
 						}
 					});	
 				}
